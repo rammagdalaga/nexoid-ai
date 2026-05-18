@@ -1,0 +1,41 @@
+{
+  "summary": {
+    "total_findings": 4,
+    "by_severity": {
+      "critical": 3,
+      "high": 0,
+      "medium": 0,
+      "low": 1
+    }
+  },
+  "findings": [
+    {
+      "file": "training/deepspeed_config.py",
+      "severity": "critical",
+      "type": "hardcoded_secret",
+      "match": "TOKEN=\"${{HF_TOKEN:-}}\"",
+      "fix": "Move secret material to environment variables and rotate credentials."
+    },
+    {
+      "file": "training/deepspeed_config.py",
+      "severity": "critical",
+      "type": "hardcoded_secret",
+      "match": "API_KEY=\"${{WANDB_API_KEY:-}}\"",
+      "fix": "Move secret material to environment variables and rotate credentials."
+    },
+    {
+      "file": "evaluation/benchmarks.py",
+      "severity": "low",
+      "type": "unsafe_import",
+      "match": "subprocess",
+      "fix": "Review necessity of 'subprocess' and constrain untrusted input paths."
+    },
+    {
+      "file": "tokenizer/tokenizer.py",
+      "severity": "critical",
+      "type": "hardcoded_secret",
+      "match": "TOKEN  = \"<|endoftext|>\"",
+      "fix": "Move secret material to environment variables and rotate credentials."
+    }
+  ]
+}
