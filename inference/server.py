@@ -27,7 +27,7 @@ from models.transformer import GPT
 from tokenizer.tokenizer import CodeTokenizer
 from inference.generate import find_latest_checkpoint, load_model, generate
 from inference.streaming import TokenStreamer
-from security.rate_limit import InMemoryRateLimiter, RateLimitRule
+from security.rate_limit import create_rate_limiter, RateLimitRule
 from security.validation import (
     MAX_BODY_BYTES,
     ValidationError,
@@ -36,8 +36,9 @@ from security.validation import (
     extract_chat_prompt,
     require_object,
     sanitize_prompt,
+    validate_endpoint_schema,
 )
-from security.logging import log_event
+from security.logging import create_logger
 
 
 # ── Global model instance (lazy loaded) ─────
@@ -46,7 +47,8 @@ _model = None
 _tokenizer = None
 _cfg = None
 _device = None
-_RATE_LIMITER = InMemoryRateLimiter()
+_RATE_LIMITER = create_rate_limiter()
+_LOGGER = create_logger()
 GLOBAL_RULE = RateLimitRule(limit=120, window_seconds=60)
 INFER_RULE = RateLimitRule(limit=30, window_seconds=60)
 AUTH_RULE = RateLimitRule(limit=5, window_seconds=900)
@@ -98,13 +100,23 @@ class InferenceHandler(BaseHTTPRequestHandler):
             return xff.split(",")[0].strip()
         return self.client_address[0]
 
+    def _client_user(self) -> str:
+        return self.headers.get("X-User-Id", "anonymous")
+
     def _rate_limit_or_reject(self, rule: RateLimitRule, bucket: str) -> bool:
         ip = self._client_ip()
-        k = f"{bucket}:{ip}"
-        if not _RATE_LIMITER.allow(k, rule):
-            log_event("rate_limit_block", ip=ip, bucket=bucket, path=self.path)
-            self._send_error(429, "Rate limit exceeded")
-            return False
+        user = self._client_user()
+        endpoint = urlparse(self.path).path
+        keys = [
+            f"{bucket}:ip:{ip}:endpoint:{endpoint}",
+            f"{bucket}:user:{user}:endpoint:{endpoint}",
+            f"{bucket}:global:endpoint:{endpoint}",
+        ]
+        for k in keys:
+            if not _RATE_LIMITER.allow(k, rule):
+                _LOGGER.log("security", "rate_limit_block", ip=ip, user=user, bucket=bucket, endpoint=endpoint)
+                self._send_error(429, "Rate limit exceeded")
+                return False
         return True
 
     def do_POST(self):
@@ -130,14 +142,17 @@ class InferenceHandler(BaseHTTPRequestHandler):
 
         try:
             if parsed.path == "/v1/completions":
+                validate_endpoint_schema("inference", data)
                 if not self._rate_limit_or_reject(INFER_RULE, "inference"):
                     return
                 self._handle_completion(data)
             elif parsed.path == "/v1/chat/completions":
+                validate_endpoint_schema("inference", data)
                 if not self._rate_limit_or_reject(INFER_RULE, "inference"):
                     return
                 self._handle_chat(data)
             elif parsed.path == "/v1/generate":
+                validate_endpoint_schema("inference", data)
                 if not self._rate_limit_or_reject(INFER_RULE, "inference"):
                     return
                 self._handle_generate(data)
@@ -271,7 +286,7 @@ def start_server(host: str = "0.0.0.0", port: int = 8080,
     print(f"[APEXAI] Model loaded: {_model.num_params()/1e6:.1f}M params")
 
     print(f"[APEXAI] Server ready at http://{host}:{port}")
-    log_event("server_start", host=host, port=port)
+    _LOGGER.log("security", "server_start", host=host, port=port, stateless_mode=True)
     print(f"  Endpoints:")
     print(f"    GET  /health          — Health check")
     print(f"    GET  /v1/models        — List models")
