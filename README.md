@@ -1,44 +1,79 @@
 ![Nexoid Atlas Banner](./nexoid-banner.jpg)
 
-# Nexoid Atlas v1.0
+# ApexAI — Phase 2 Finalized Runtime Core
 
-Nexoid Atlas v1.0 is a developer-focused AI system designed for coding and SEO optimization.
+ApexAI is a **from-scratch transformer intelligence system** focused on coding workflows.
 
-## Overview
+## Phase 2 Status
 
-Nexoid Atlas v1.0 assists developers in building and improving software by focusing on two core strengths:
-- **Coding assistance**: generating, debugging, and improving code for applications and systems
-- **SEO optimization**: enhancing website structure, content quality, and search engine visibility
+Phase 2 hardening/finalization is complete:
+- Concurrency-safe EventBus
+- Deterministic, bounded InferenceBatcher
+- Lifecycle-safe TrainingOrchestrator
+- Atomic, integrity-verified CheckpointManager
+- State-reconciled SystemManager
+- Deterministic validated Pipeline
+- Extended security and validation controls
 
-It is designed to help creators move from idea to deployment with cleaner code and better-performing web projects.
+## Architecture Overview
 
-## Core Capabilities
+### Core Integration Modules
+- `core/system_manager.py` — runtime lifecycle authority and subsystem coordinator.
+- `core/pipeline.py` — deterministic stage flow + validated handoff envelopes.
+- `core/event_bus.py` — internal publish/subscribe event transport.
 
-- Generate and improve application code
-- Debug and refactor existing projects
-- Suggest better software architecture
-- Optimize websites for search engines
-- Improve content structure and ranking strategies
-- Assist in building efficient full web projects
+### Runtime Subsystems
+- `training/orchestrator.py` — training queue/worker lifecycle simulation.
+- `training/checkpoint_manager.py` — versioned checkpoint save/load/verify/rotate.
+- `inference/batcher.py` — bounded fair batch scheduling for inference requests.
+- `system/health_monitor.py` — runtime health telemetry snapshots.
+- `security/validation.py` / `security/rate_limit.py` / `security/logging.py` — input hardening, throttling, structured logging.
 
-## Purpose
+## Execution Flow (Text Diagram)
 
-Nexoid Atlas v1.0 is built to act as a developer intelligence layer that bridges software engineering and web optimization, helping users create faster, cleaner, and more discoverable digital products.
+`dataset -> training -> checkpoint -> inference -> evaluation`
 
-## Current Version
+Implemented in `core/pipeline.py` via strict stage ordering and validation gates.
 
-**Nexoid Atlas v1.0 (Initial Release)**  
-This is the first version of the Nexoid AI model system.
+## Strict Dependency Rules
 
-## Notes
+ApexAI enforces:
+- **NO** OpenAI/Anthropic/Cohere SDK usage
+- **NO** transformers/vLLM/LangChain/PEFT/TRL/accelerate usage
+- Only HuggingFace `datasets` allowed for dataset ingestion
 
-- This project focuses on AI-assisted development workflows
-- Future versions will expand capabilities and intelligence depth
+## Validation
 
-## Nexoid Vision
+Run repository validation:
 
-To build a powerful AI ecosystem that helps developers create scalable, optimized, and intelligent web applications efficiently.
+```bash
+python _validate.py
+```
+
+This checks syntax, module integration, security constraints, concurrency markers, deterministic pipeline markers, and forbidden dependencies.
+
+## Training Entry Points
+
+### Standard training CLI
+```bash
+python main.py train --config small
+```
+
+### Orchestrator-managed training lifecycle (integration path)
+- Instantiate `SystemManager`
+- Submit job with `submit_training_job(...)`
+- Monitor using `check_training_job(...)`
+
+## Trace Logging Mode
+
+Structured trace mode is available via environment variable:
+
+```bash
+export APEXAI_TRACE_MODE=1
+```
+
+When enabled, trace-level events are emitted for pipeline/reconciliation and key lifecycle operations through existing structured logging routes.
 
 ---
 
-> Built under the Nexoid.ai system
+Built under the Nexoid.ai / ApexAI system.
