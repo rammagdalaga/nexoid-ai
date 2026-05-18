@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="./nexoid-banner.jpg" width="100%" />
-</p>
-
 ![Nexoid Atlas Banner](./nexoid-banner.jpg)
 
 # Nexoid Atlas v1.0
