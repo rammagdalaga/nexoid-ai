@@ -1,0 +1,26 @@
+# ── Core ──
+torch>=2.1.0
+torchvision>=0.16.0            # PyTorch ecosystem
+datasets>=2.14.0               # HuggingFace datasets (streaming)
+huggingface_hub>=0.19.0        # HuggingFace Hub auth
+tokenizers>=0.15.0             # Fast BPE tokenizer (Rust)
+tqdm>=4.65.0                   # Progress bars
+numpy>=1.24.0                  # Numerical computing
+
+# ── Optional: Cloud / Scale ──
+wandb>=0.16.0                  # Experiment tracking
+accelerate>=0.25.0             # Multi-GPU / distributed training
+deepspeed>=0.12.0              # ZeRO optimization (cloud only)
+pynvml>=11.5.0                 # GPU monitoring (NVML)
+
+# ── Optional: Flash Attention ──
+flash-attn>=2.3.0              # Flash Attention (Ampere+ GPUs)
+
+# ── Optional: Colab Complements ──
+# google-colab>=1.0.0          # Colab environment (auto-installed on Colab)
+# transformers>=4.36.0         # HuggingFace transformers (compatibility)
+
+# ── Installation Guide ──
+# Base:     pip install -r requirements.txt
+# Cloud:    pip install deepspeed flash-attn
+# Colab:    Already has torch, skip torch install

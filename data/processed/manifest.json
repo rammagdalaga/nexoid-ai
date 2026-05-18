@@ -1,0 +1,9 @@
+{
+  "train": [
+    "shard_0000.pt"
+  ],
+  "val": [
+    "shard_0000.pt"
+  ],
+  "vocab_size": 1882
+}
