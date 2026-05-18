@@ -76,6 +76,9 @@ checks = {
     'usage_tracker_fully_integrated': ('api/gateway.py', ['record_request', 'record_tokens', 'record_violation']),
     'no_duplicate_rate_limit_systems': ('api/gateway.py', ['enforce_rate_limit']),
     'router_gateway_consistency': ('api/router.py', ['register', 'dispatch']),
+    'single_canonical_api_flow': ('api/gateway.py', ['gateway_flow="Auth>RateLimit>Validation>Router>EventBus>Pipeline>Inference>Response"', '_preflight']),
+    'streaming_mirrors_standard': ('api/gateway.py', ['stream_inference', '_preflight("/v1/inference"']),
+    'phase2_lock_marker': ('VERSION.txt', ['Phase 2 Status: LOCKED', 'API Platform: FROZEN', 'Architecture: STABLE', 'Ready for Phase 3: TRUE']),
     'system_manager_integrates_modules': (
         'core/system_manager.py',
         ['TrainingOrchestrator', 'CheckpointManager', 'InferenceBatcher', 'HealthMonitor', 'EventBus']
@@ -230,6 +233,14 @@ for req in ['0.2.0', 'stable', 'fully integrated', '2 complete']:
 if all(r in vtxt for r in ['0.2.0', 'stable', 'fully integrated', '2 complete']):
     print('  ✓ version_file')
 
+# duplicate middleware chain check
+gw_txt = (root / 'api/gateway.py').read_text(encoding='utf-8')
+if gw_txt.count('_preflight(') <= 3 and 'handle(' in gw_txt and 'stream_inference' in gw_txt:
+    print('  ✓ duplicate_middleware_chain')
+else:
+    print('  ✗ duplicate_middleware_chain')
+    all_ok = False
+
 # phase3 readiness marker
 if 'READY FOR PHASE 3' in ''.join((root / m).read_text(encoding='utf-8') for m in final_modules):
     print('  ✓ phase3_ready_markers')
@@ -253,6 +264,15 @@ if '_event_seq' in eb_txt and '_history' in eb_txt and 'publish(' in eb_txt:
 else:
     print('  ✗ event_bus_integrity_markers')
     all_ok = False
+
+api_modules = ['api/gateway.py','api/router.py','api/response.py','api/streaming.py','security/api_key_auth.py','security/usage_tracker.py']
+for am in api_modules:
+    txt = (root / am).read_text(encoding='utf-8')
+    if 'CHANGELOG:' in txt:
+        print(f'  ✓ api_changelog_blocks: {am}')
+    else:
+        print(f'  ✗ api_changelog_blocks: {am}')
+        all_ok = False
 
 print(f'\n{"All files OK!" if all_ok else "Some files have errors!"}')
 sys.exit(0 if all_ok else 1)
