@@ -1,0 +1,9 @@
+{
+  "theme": "black",
+  "api_base_url": "http://localhost:8000",
+  "api_key": "NEXOID_API_KEY_HERE",
+  "streaming": true,
+  "model": "atlas",
+  "temperature": 0.7,
+  "mode": "chat"
+}
