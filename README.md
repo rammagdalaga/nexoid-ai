@@ -1,4 +1,4 @@
-![Nexoid Atlas Banner](./nexoid-banner.png)
+![Nexoid Banner](./nexoid-banner.jpeg)
 
 \# Nexoid Atlas v1.0
 
