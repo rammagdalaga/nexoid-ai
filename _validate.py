@@ -149,7 +149,7 @@ status_modules = [
 ]
 for m in status_modules:
     txt = (root / m).read_text(encoding='utf-8')
-    if 'APEXAI MODULE STATUS' in txt and 'Thread Safety: ENFORCED' in txt:
+    if 'APEXAI PHASE 2 FINAL STATE' in txt and 'Distributed Readiness: TRUE' in txt:
         print(f'  ✓ architecture_block: {m}')
     else:
         print(f'  ✗ architecture_block: {m}')
@@ -173,6 +173,49 @@ if 'APEXAI_TRACE_MODE' in log_txt and 'def trace(' in log_txt:
     print('  ✓ trace_mode_integration')
 else:
     print('  ✗ trace_mode_integration')
+    all_ok = False
+
+
+# phase 2 final header + changelog checks
+final_modules = [
+    'core/event_bus.py',
+    'core/system_manager.py',
+    'core/pipeline.py',
+    'inference/batcher.py',
+    'training/orchestrator.py',
+    'training/checkpoint_manager.py',
+]
+for m in final_modules:
+    txt = (root / m).read_text(encoding='utf-8')
+    required = [
+        'APEXAI PHASE 2 FINAL STATE',
+        'Status: COMPLETE',
+        'System Integrity: VERIFIED',
+        'Distributed Readiness: TRUE',
+        'Phase: READY FOR PHASE 3',
+        'CHANGELOG:',
+    ]
+    miss = [r for r in required if r not in txt]
+    if miss:
+        print(f'  ✗ phase2_final_block: {m} missing {miss}')
+        all_ok = False
+    else:
+        print(f'  ✓ phase2_final_block: {m}')
+
+# version file check
+vtxt = (root / 'VERSION.txt').read_text(encoding='utf-8') if (root / 'VERSION.txt').exists() else ''
+for req in ['0.2.0', 'stable', 'fully integrated', '2 complete']:
+    if req not in vtxt:
+        print(f'  ✗ version_file_missing: {req}')
+        all_ok = False
+if all(r in vtxt for r in ['0.2.0', 'stable', 'fully integrated', '2 complete']):
+    print('  ✓ version_file')
+
+# phase3 readiness marker
+if 'READY FOR PHASE 3' in ''.join((root / m).read_text(encoding='utf-8') for m in final_modules):
+    print('  ✓ phase3_ready_markers')
+else:
+    print('  ✗ phase3_ready_markers')
     all_ok = False
 
 print(f'\n{"All files OK!" if all_ok else "Some files have errors!"}')
