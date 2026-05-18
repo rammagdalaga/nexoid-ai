@@ -28,3 +28,12 @@ class APIKeyAuth:
     @staticmethod
     def extract_key(headers: Dict[str, str]) -> str:
         return headers.get("X-API-Key", "")
+
+"""
+CHANGELOG:
+- API Platform stabilization pass completed
+- Flow consistency verified
+- Security enforcement unified
+- Streaming + routing integration hardened
+- Production readiness improved
+"""

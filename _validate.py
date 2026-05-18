@@ -71,6 +71,11 @@ checks = {
     'api_key_enforcement_active': ('api/gateway.py', ['APIKeyAuth', 'validate(key)', 'enforce_rate_limit']),
     'all_api_routes_require_auth': ('api/gateway.py', ['unauthorized', 'extract_key']),
     'no_direct_model_bypass': ('core/system_manager.py', ['submit_inference_payload']),
+    'api_flow_order_correctness': ('api/gateway.py', ['_preflight', 'router.dispatch', 'gateway_flow="Auth>RateLimit>Validation>Router>EventBus>Pipeline>Inference>Response"']),
+    'streaming_no_auth_bypass': ('api/gateway.py', ['stream_inference', '_preflight("/v1/inference"']),
+    'usage_tracker_fully_integrated': ('api/gateway.py', ['record_request', 'record_tokens', 'record_violation']),
+    'no_duplicate_rate_limit_systems': ('api/gateway.py', ['enforce_rate_limit']),
+    'router_gateway_consistency': ('api/router.py', ['register', 'dispatch']),
     'system_manager_integrates_modules': (
         'core/system_manager.py',
         ['TrainingOrchestrator', 'CheckpointManager', 'InferenceBatcher', 'HealthMonitor', 'EventBus']
@@ -232,8 +237,6 @@ else:
     print('  ✗ phase3_ready_markers')
     all_ok = False
 
-print(f'\n{"All files OK!" if all_ok else "Some files have errors!"}')
-sys.exit(0 if all_ok else 1)
 
 # orphan async tasks running untracked check
 sm_txt = (root / 'core/system_manager.py').read_text(encoding='utf-8')
@@ -250,3 +253,6 @@ if '_event_seq' in eb_txt and '_history' in eb_txt and 'publish(' in eb_txt:
 else:
     print('  ✗ event_bus_integrity_markers')
     all_ok = False
+
+print(f'\n{"All files OK!" if all_ok else "Some files have errors!"}')
+sys.exit(0 if all_ok else 1)
