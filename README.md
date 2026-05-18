@@ -1,5 +1,6 @@
-![Nexoid Atlas Banner](./nexoid-banner.jpeg)
-\# Nexoid Atlas v1.0
+![Nexoid Atlas Banner](./nexoid-banner.jpg)
+
+# Nexoid Atlas v1.0
 
 Nexoid Atlas v1.0 is a developer-focused AI system designed for coding and SEO optimization.
 
