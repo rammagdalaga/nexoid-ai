@@ -5,6 +5,7 @@ GPU memory profiling, estimation, and optimization helpers.
 
 import os
 import gc
+import time
 import torch
 from typing import Dict, Optional
 
@@ -180,3 +181,52 @@ def log_memory_usage(step: int, prefix: str = ""):
     allocated = torch.cuda.memory_allocated() / 1e9
     reserved = torch.cuda.memory_reserved() / 1e9
     print(f"{prefix} step {step}: allocated={allocated:.2f}GB  reserved={reserved:.2f}GB")
+
+class KVCacheManager:
+    """Custom LRU-like KV cache manager with trimming and eviction."""
+    def __init__(self, max_entries: int = 16, max_seq_len: int = 32768):
+        self.max_entries = max_entries
+        self.max_seq_len = max_seq_len
+        self._store = {}   # key -> {cache, last_access}
+
+    def put(self, key: str, cache_obj):
+        self._store[key] = {"cache": cache_obj, "last_access": time.time()}
+        self._evict_if_needed()
+
+    def get(self, key: str):
+        rec = self._store.get(key)
+        if not rec:
+            return None
+        rec["last_access"] = time.time()
+        return rec["cache"]
+
+    def trim_kv_cache(self, cache_obj, keep_last_tokens: int = 32768):
+        if cache_obj is None or not hasattr(cache_obj, "_cache"):
+            return cache_obj
+        keep = max(1, min(keep_last_tokens, self.max_seq_len))
+        for layer_idx, kv in list(cache_obj._cache.items()):
+            k, v = kv
+            if k.shape[2] > keep:
+                cache_obj._cache[layer_idx] = (k[:, :, -keep:, :], v[:, :, -keep:, :])
+        cache_obj.seen_tokens = min(getattr(cache_obj, "seen_tokens", keep), keep)
+        return cache_obj
+
+    def sliding_window_context(self, input_ids, window: int = 32768):
+        if input_ids is None:
+            return input_ids
+        win = max(1, min(window, self.max_seq_len))
+        if hasattr(input_ids, "shape") and input_ids.shape[-1] > win:
+            return input_ids[..., -win:]
+        return input_ids
+
+    def memory_pressure_detected(self, threshold: float = 0.9) -> bool:
+        if not torch.cuda.is_available():
+            return False
+        total = torch.cuda.get_device_properties(0).total_memory
+        reserved = torch.cuda.memory_reserved(0)
+        return (reserved / max(total, 1)) >= threshold
+
+    def _evict_if_needed(self):
+        while len(self._store) > self.max_entries:
+            oldest = min(self._store.items(), key=lambda kv: kv[1]["last_access"])[0]
+            del self._store[oldest]
