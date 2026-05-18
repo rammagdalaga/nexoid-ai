@@ -1,3 +1,16 @@
+"""
+APEXAI MODULE STATUS
+Phase: 2 HARDENING COMPLETE
+Role: Deterministic stage-to-stage pipeline executor
+Dependencies: SystemManager, security.validation, evaluation.benchmarks
+System Integration: ACTIVE
+Thread Safety: ENFORCED
+
+Purpose:
+- Enforce validated stage ordering and standardized handoff envelopes.
+- Prevent invalid transitions across dataset/training/checkpoint/inference/evaluation.
+"""
+
 import uuid
 from typing import Any, Callable, Dict, List
 

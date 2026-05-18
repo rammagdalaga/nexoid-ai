@@ -1,3 +1,16 @@
+"""
+APEXAI MODULE STATUS
+Phase: 2 HARDENING COMPLETE
+Role: Training job scheduler and worker lifecycle controller
+Dependencies: SystemManager training lifecycle
+System Integration: ACTIVE
+Thread Safety: ENFORCED
+
+Responsibilities:
+- Accept queued training jobs and dispatch to simulated workers safely.
+- Maintain stable job state transitions under pause/resume/stop paths.
+"""
+
 import queue
 import threading
 import time

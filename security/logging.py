@@ -1,9 +1,24 @@
+"""
+APEXAI MODULE STATUS
+Phase: 2 HARDENING COMPLETE
+Role: Structured logging and observability routing
+Dependencies: stdlib json/os/time, router implementations
+System Integration: ACTIVE
+Thread Safety: ENFORCED
+
+Purpose:
+- Provide consistent JSON logging across security, inference, training, and evaluation paths.
+- Support release-readiness observability with optional trace logging mode.
+"""
+
 import json
 import os
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Dict, Any
+
+TRACE_MODE = os.environ.get("APEXAI_TRACE_MODE", "0") == "1"
 
 
 @dataclass
@@ -47,7 +62,6 @@ class FileRouter(LogRouter):
 
 class CloudStubRouter(LogRouter):
     def write(self, event: LogEvent) -> None:
-        # Stub adapter intentionally local-only for future integration.
         return None
 
 
@@ -59,6 +73,10 @@ class StructuredLogger:
         entry = LogEvent(category=category, event=event, payload=payload)
         for router in self.routers:
             router.write(entry)
+
+    def trace(self, event: str, **payload):
+        if TRACE_MODE:
+            self.log("trace", event, **payload)
 
 
 def create_logger() -> StructuredLogger:

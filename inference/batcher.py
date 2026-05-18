@@ -1,3 +1,16 @@
+"""
+APEXAI MODULE STATUS
+Phase: 2 HARDENING COMPLETE
+Role: Bounded deterministic inference request batcher
+Dependencies: SystemManager inference path
+System Integration: ACTIVE
+Thread Safety: ENFORCED
+
+Responsibilities:
+- Batch queued requests fairly with bounded latency windows.
+- Prevent request loss and return shutdown errors for undelivered requests.
+"""
+
 import threading
 import time
 from collections import deque

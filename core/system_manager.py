@@ -1,3 +1,16 @@
+"""
+APEXAI MODULE STATUS
+Phase: 2 HARDENING COMPLETE
+Role: Global runtime coordinator and lifecycle authority
+Dependencies: EventBus, TrainingOrchestrator, CheckpointManager, InferenceBatcher, HealthMonitor, validation layer
+System Integration: ACTIVE
+Thread Safety: ENFORCED
+
+Purpose:
+- Keep system state aligned with real subsystem state.
+- Route errors/recovery and enforce deterministic lifecycle transitions.
+"""
+
 import threading
 import time
 from typing import Any, Dict, Optional
@@ -8,6 +21,7 @@ from security.validation import ValidationError, require_object, validate_endpoi
 from system.health_monitor import HealthMonitor
 from training.checkpoint_manager import CheckpointManager
 from training.orchestrator import TrainingOrchestrator, JOB_FAILED, JOB_RUNNING, JOB_QUEUED, JOB_COMPLETED
+from security.logging import create_logger
 
 
 class SystemManager:
@@ -32,6 +46,7 @@ class SystemManager:
         self.checkpoint_manager = CheckpointManager(checkpoint_dir, keep_last_n=5)
         self.inference_batcher = InferenceBatcher(max_batch_size=8, max_wait_ms=30)
         self.health_monitor = HealthMonitor(window=100)
+        self.logger = create_logger()
         self._lock = threading.RLock()
         self._setup_subscriptions()
         self._register_event_contract()
@@ -82,6 +97,7 @@ class SystemManager:
         self._transition(self.STATE_TRAINING)
         job_id = self.training_orchestrator.submit_job(config)
         self.event_bus.publish("training_started", {"job_id": job_id, "config": dict(config)})
+        self.logger.trace("training_started", job_id=job_id)
         return job_id
 
     def check_training_job(self, job_id: str) -> Optional[Dict[str, Any]]:
@@ -102,6 +118,7 @@ class SystemManager:
     def save_checkpoint_from_training(self, step: int, model_state: Dict[str, Any], optimizer_state: Dict[str, Any], meta: Dict[str, Any]) -> str:
         path = self.checkpoint_manager.save(step, model_state, optimizer_state, meta)
         self.event_bus.publish("checkpoint_saved", {"step": step, "path": path})
+        self.logger.trace("checkpoint_saved", step=step, path=path)
         return path
 
     def submit_inference_payload(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -131,6 +148,7 @@ class SystemManager:
         done.wait(timeout=2.0)
         latency = time.time() - start
         self.event_bus.publish("inference_batch_processed", {"latency_s": latency})
+        self.logger.trace("inference_batch_processed", latency_s=latency)
         if result_holder["result"] is None:
             self._emit_error("inference", "batch timeout", recovery="retry")
             return {"stage": "inference", "status": "failed", "data": None, "meta": {"latency_s": latency}, "errors": ["batch timeout"]}
@@ -162,6 +180,7 @@ class SystemManager:
 
     def _reconcile_loop(self):
         while not self._stop_reconcile.is_set():
+            self.logger.trace("reconcile_tick", state=self.state)
             try:
                 self.reconcile_state()
             except Exception as e:

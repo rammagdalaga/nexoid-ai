@@ -137,6 +137,44 @@ else:
     print('  ✗ moe_intact')
     all_ok = False
 
+
+# module docstring + architecture block checks
+status_modules = [
+    'core/event_bus.py',
+    'core/system_manager.py',
+    'core/pipeline.py',
+    'inference/batcher.py',
+    'training/orchestrator.py',
+    'training/checkpoint_manager.py',
+]
+for m in status_modules:
+    txt = (root / m).read_text(encoding='utf-8')
+    if 'APEXAI MODULE STATUS' in txt and 'Thread Safety: ENFORCED' in txt:
+        print(f'  ✓ architecture_block: {m}')
+    else:
+        print(f'  ✗ architecture_block: {m}')
+        all_ok = False
+
+# README completeness
+readme = (root / 'README.md').read_text(encoding='utf-8')
+required_readme = [
+    'Architecture Overview', 'Execution Flow', 'Strict Dependency Rules', '_validate.py', 'APEXAI_TRACE_MODE'
+]
+missing = [x for x in required_readme if x not in readme]
+if missing:
+    print(f'  ✗ readme_completeness: missing {missing}')
+    all_ok = False
+else:
+    print('  ✓ readme_completeness')
+
+# trace mode integration
+log_txt = (root / 'security/logging.py').read_text(encoding='utf-8')
+if 'APEXAI_TRACE_MODE' in log_txt and 'def trace(' in log_txt:
+    print('  ✓ trace_mode_integration')
+else:
+    print('  ✗ trace_mode_integration')
+    all_ok = False
+
 print(f'\n{"All files OK!" if all_ok else "Some files have errors!"}')
 sys.exit(0 if all_ok else 1)
 

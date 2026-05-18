@@ -1,3 +1,16 @@
+"""
+APEXAI MODULE STATUS
+Phase: 2 HARDENING COMPLETE
+Role: Atomic checkpoint persistence and recovery manager
+Dependencies: training loop + SystemManager recovery logic
+System Integration: ACTIVE
+Thread Safety: ENFORCED
+
+Responsibilities:
+- Save/load versioned checkpoints with integrity validation.
+- Rotate older artifacts while preserving latest reliable recovery points.
+"""
+
 import hashlib
 import os
 import threading

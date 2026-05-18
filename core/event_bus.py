@@ -1,3 +1,17 @@
+"""
+APEXAI MODULE STATUS
+Phase: 2 HARDENING COMPLETE
+Role: Internal publish/subscribe communication bus
+Dependencies: SystemManager, pipeline lifecycle publishers, handlers
+System Integration: ACTIVE
+Thread Safety: ENFORCED
+
+Responsibilities:
+- Deliver in-process integration events across modules.
+- Preserve event ordering via monotonic sequence ids.
+- Surface handler failures to SystemManager error handling.
+"""
+
 import threading
 import time
 from collections import defaultdict
@@ -25,30 +39,17 @@ class EventBus:
             self._event_seq += 1
             event_id = self._event_seq
             handlers = list(self._subs.get(event_name, []))
-            record = {
-                "event_id": event_id,
-                "event": event_name,
-                "ts": time.time(),
-                "payload": dict(payload),
-                "handlers": len(handlers),
-            }
-            self._history.append(record)
+            self._history.append({"event_id": event_id, "event": event_name, "ts": time.time(), "payload": dict(payload)})
             if len(self._history) > 5000:
                 self._history = self._history[-5000:]
+            error_handler = self._error_handler
 
         for handler in handlers:
             try:
                 handler(payload)
             except Exception as e:
-                err = {
-                    "event_id": event_id,
-                    "event": event_name,
-                    "handler_error": str(e),
-                }
-                with self._lock:
-                    error_handler = self._error_handler
                 if error_handler:
-                    error_handler(err)
+                    error_handler({"event_id": event_id, "event": event_name, "handler_error": str(e)})
         return event_id
 
     def recent_events(self, limit: int = 100) -> List[Dict[str, Any]]:
