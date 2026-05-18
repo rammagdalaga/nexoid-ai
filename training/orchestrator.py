@@ -29,26 +29,42 @@ class Worker:
         self.worker_id = worker_id
         self.simulated_gpus = max(1, simulated_gpus)
         self.is_busy = False
+        self._lock = threading.RLock()
 
-    def run(self, job: TrainingJob):
-        self.is_busy = True
-        job.status = JOB_RUNNING
-        job.started_at = time.time()
+    def run(self, job: TrainingJob, lock: threading.RLock):
+        with self._lock:
+            self.is_busy = True
+        with lock:
+            if job.status != JOB_QUEUED:
+                self.is_busy = False
+                return
+            job.status = JOB_RUNNING
+            job.started_at = time.time()
+
         try:
-            # Simulated distributed execution runtime
             simulated_steps = int(job.config.get("simulated_steps", 5))
             for _ in range(simulated_steps):
-                if job.status == JOB_PAUSED:
-                    while job.status == JOB_PAUSED:
-                        time.sleep(0.1)
+                with lock:
+                    status = job.status
+                if status == JOB_PAUSED:
+                    while True:
+                        with lock:
+                            if job.status != JOB_PAUSED:
+                                break
+                        time.sleep(0.05)
                 time.sleep(0.05 / self.simulated_gpus)
-            job.status = JOB_COMPLETED
+            with lock:
+                if job.status not in (JOB_FAILED,):
+                    job.status = JOB_COMPLETED
         except Exception as e:
-            job.status = JOB_FAILED
-            job.error = str(e)
+            with lock:
+                job.status = JOB_FAILED
+                job.error = str(e)
         finally:
-            job.ended_at = time.time()
-            self.is_busy = False
+            with lock:
+                job.ended_at = time.time()
+            with self._lock:
+                self.is_busy = False
 
 
 class TrainingOrchestrator:
@@ -59,34 +75,38 @@ class TrainingOrchestrator:
             Worker(worker_id=f"worker_{i}", simulated_gpus=gpus_per_worker)
             for i in range(max(1, num_workers))
         ]
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._stop = threading.Event()
+        self._worker_threads: Dict[str, threading.Thread] = {}
         self._dispatcher = threading.Thread(target=self._dispatch_loop, daemon=True)
         self._dispatcher.start()
 
     def submit_job(self, config: Dict[str, Any]) -> str:
-        job = TrainingJob(config=config)
+        job = TrainingJob(config=dict(config))
         with self._lock:
             self.jobs[job.job_id] = job
         self.job_queue.put(job)
         return job.job_id
 
     def pause_job(self, job_id: str) -> bool:
-        job = self.jobs.get(job_id)
-        if not job or job.status != JOB_RUNNING:
-            return False
-        job.status = JOB_PAUSED
-        return True
+        with self._lock:
+            job = self.jobs.get(job_id)
+            if not job or job.status != JOB_RUNNING:
+                return False
+            job.status = JOB_PAUSED
+            return True
 
     def resume_job(self, job_id: str) -> bool:
-        job = self.jobs.get(job_id)
-        if not job or job.status != JOB_PAUSED:
-            return False
-        job.status = JOB_RUNNING
-        return True
+        with self._lock:
+            job = self.jobs.get(job_id)
+            if not job or job.status != JOB_PAUSED:
+                return False
+            job.status = JOB_RUNNING
+            return True
 
     def get_job(self, job_id: str) -> Optional[TrainingJob]:
-        return self.jobs.get(job_id)
+        with self._lock:
+            return self.jobs.get(job_id)
 
     def _dispatch_loop(self):
         while not self._stop.is_set():
@@ -95,15 +115,24 @@ class TrainingOrchestrator:
             except queue.Empty:
                 continue
             worker = self._wait_for_available_worker()
-            threading.Thread(target=worker.run, args=(job,), daemon=True).start()
+            t = threading.Thread(target=worker.run, args=(job, self._lock), daemon=True)
+            with self._lock:
+                self._worker_threads[job.job_id] = t
+            t.start()
 
     def _wait_for_available_worker(self) -> Worker:
-        while True:
+        while not self._stop.is_set():
             for w in self.workers:
-                if not w.is_busy:
-                    return w
-            time.sleep(0.05)
+                with w._lock:
+                    if not w.is_busy:
+                        return w
+            time.sleep(0.01)
+        return self.workers[0]
 
     def stop(self):
         self._stop.set()
-        self._dispatcher.join(timeout=1.0)
+        self._dispatcher.join(timeout=2.0)
+        with self._lock:
+            threads = list(self._worker_threads.values())
+        for t in threads:
+            t.join(timeout=1.0)

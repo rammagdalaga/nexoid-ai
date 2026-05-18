@@ -73,6 +73,14 @@ checks = {
     'distributed_rate_limiter': ('security/rate_limit.py', ['RateLimiterBackend', 'RedisRateLimiter', 'SimulatedRedisRateLimiter']),
     'security_scanner': ('security/audit_scanner.py', ['scan_repo', 'hardcoded_secret']),
     'logging_pipeline': ('security/logging.py', ['StructuredLogger', 'FileRouter', 'CloudStubRouter']),
+    'concurrency_safety_event_bus': ('core/event_bus.py', ['threading.RLock', '_event_seq', 'set_error_handler']),
+    'concurrency_safety_batcher': ('inference/batcher.py', ['threading.RLock', '_inflight', 'batcher_shutdown']),
+    'concurrency_safety_training': ('training/orchestrator.py', ['threading.RLock', '_worker_threads']),
+    'concurrency_safety_checkpoint': ('training/checkpoint_manager.py', ['threading.RLock', 'os.replace']),
+    'state_consistency_enforcement': ('core/system_manager.py', ['reconcile_state', '_reconcile_loop', 'state_reconciled']),
+    'error_propagation_unified': ('core/system_manager.py', ['_emit_error', 'system_error', 'recovery']),
+    'deterministic_pipeline': ('core/pipeline.py', ['run_id', '_valid_transition', 'run_full_pipeline']),
+    'memory_safety_guards': ('utils/memory.py', ['trim_kv_cache', 'sliding_window_context', 'memory_pressure_detected']),
 }
 
 for name, (rel, needles) in checks.items():
@@ -131,3 +139,19 @@ else:
 
 print(f'\n{"All files OK!" if all_ok else "Some files have errors!"}')
 sys.exit(0 if all_ok else 1)
+
+# orphan async tasks running untracked check
+sm_txt = (root / 'core/system_manager.py').read_text(encoding='utf-8')
+if '_reconcile_thread' in sm_txt and 'join(timeout=' in sm_txt:
+    print('  ✓ orphan_async_tasks_tracked')
+else:
+    print('  ✗ orphan_async_tasks_tracked')
+    all_ok = False
+
+# event bus integrity under load markers
+eb_txt = (root / 'core/event_bus.py').read_text(encoding='utf-8')
+if '_event_seq' in eb_txt and '_history' in eb_txt and 'publish(' in eb_txt:
+    print('  ✓ event_bus_integrity_markers')
+else:
+    print('  ✗ event_bus_integrity_markers')
+    all_ok = False
