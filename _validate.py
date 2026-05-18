@@ -1,6 +1,5 @@
 import ast
 import sys
-import os
 from pathlib import Path
 
 files = [
@@ -15,17 +14,20 @@ files = [
     'training/multilingual_aligner.py',
     'training/repo_parser.py',
     'training/profiler.py',
-    'system/health_monitor.py',
-    'inference/batcher.py',
     'training/checkpoint_manager.py',
     'training/orchestrator.py',
     'inference/generate.py',
     'inference/streaming.py',
     'inference/server.py',
+    'inference/batcher.py',
     'evaluation/__init__.py',
     'evaluation/benchmarks.py',
     'evaluation/seo_eval.py',
     'evaluation/humaneval.py',
+    'system/health_monitor.py',
+    'core/event_bus.py',
+    'core/system_manager.py',
+    'core/pipeline.py',
     'utils/memory.py',
     'utils/helpers.py',
     'tokenizer/tokenizer.py',
@@ -55,8 +57,19 @@ for f in files:
         all_ok = False
 
 checks = {
-    'phase2_components': ('training/orchestrator.py', ['TrainingOrchestrator', 'JOB_COMPLETED']),
-    'stateless_server': ('inference/server.py', ['stateless_mode=True', 'create_rate_limiter']),
+    'system_manager_integrates_modules': (
+        'core/system_manager.py',
+        ['TrainingOrchestrator', 'CheckpointManager', 'InferenceBatcher', 'HealthMonitor', 'EventBus']
+    ),
+    'pipeline_flow_integrity': (
+        'core/pipeline.py',
+        ['dataset', 'training', 'checkpoint', 'inference', 'evaluation', 'run_full_pipeline']
+    ),
+    'event_bus_exists_and_used': (
+        'core/system_manager.py',
+        ['event_bus.publish', 'training_started', 'training_failed', 'checkpoint_saved', 'inference_batch_processed', 'security_violation_detected']
+    ),
+    'stateless_server': ('inference/server.py', ['create_rate_limiter']),
     'distributed_rate_limiter': ('security/rate_limit.py', ['RateLimiterBackend', 'RedisRateLimiter', 'SimulatedRedisRateLimiter']),
     'security_scanner': ('security/audit_scanner.py', ['scan_repo', 'hardcoded_secret']),
     'logging_pipeline': ('security/logging.py', ['StructuredLogger', 'FileRouter', 'CloudStubRouter']),
@@ -71,8 +84,28 @@ for name, (rel, needles) in checks.items():
     else:
         print(f'  ✓ {name}')
 
+# no orphan modules check: all core modules must be referenced by system manager/pipeline
+sys_txt = (root / 'core/system_manager.py').read_text(encoding='utf-8')
+pipe_txt = (root / 'core/pipeline.py').read_text(encoding='utf-8')
+orphans = []
+if 'TrainingOrchestrator' not in sys_txt:
+    orphans.append('training/orchestrator.py')
+if 'CheckpointManager' not in sys_txt:
+    orphans.append('training/checkpoint_manager.py')
+if 'InferenceBatcher' not in sys_txt:
+    orphans.append('inference/batcher.py')
+if 'HealthMonitor' not in sys_txt:
+    orphans.append('system/health_monitor.py')
+if 'run_evaluation_stage' not in pipe_txt:
+    orphans.append('evaluation/*')
+if orphans:
+    print(f'  ✗ orphan_modules: {orphans}')
+    all_ok = False
+else:
+    print('  ✓ orphan_modules')
+
 # forbidden dependencies usage check
-forbidden = ['openai', 'anthropic', 'cohere', 'langchain', 'vllm', 'transformers']
+forbidden = ['openai', 'anthropic', 'cohere', 'langchain', 'vllm', 'transformers', 'peft', 'trl', 'accelerate']
 violations = []
 for py in root.rglob('*.py'):
     if '__pycache__' in py.parts:
@@ -88,13 +121,13 @@ if violations:
 else:
     print('  ✓ forbidden dependency usage check')
 
+# MoE integrity
+moe_txt = (root / 'models/transformer.py').read_text(encoding='utf-8')
+if 'Mixture of Experts (MoE) support' in moe_txt and 'class MoEFFN' in moe_txt:
+    print('  ✓ moe_intact')
+else:
+    print('  ✗ moe_intact')
+    all_ok = False
+
 print(f'\n{"All files OK!" if all_ok else "Some files have errors!"}')
 sys.exit(0 if all_ok else 1)
-
-
-moe_txt = (root / "models/transformer.py").read_text(encoding="utf-8")
-if "Mixture of Experts (MoE) support" in moe_txt and "class MoEFFN" in moe_txt:
-    print("  ✓ moe_intact")
-else:
-    print("  ✗ moe_intact")
-    all_ok = False
