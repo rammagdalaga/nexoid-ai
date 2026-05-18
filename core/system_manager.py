@@ -17,6 +17,7 @@ from system.health_monitor import HealthMonitor
 from training.checkpoint_manager import CheckpointManager
 from training.orchestrator import TrainingOrchestrator, JOB_FAILED, JOB_RUNNING, JOB_QUEUED, JOB_COMPLETED
 from security.logging import create_logger
+from api.gateway import APIGateway
 
 
 class SystemManager:
@@ -42,6 +43,7 @@ class SystemManager:
         self.inference_batcher = InferenceBatcher(max_batch_size=8, max_wait_ms=30)
         self.health_monitor = HealthMonitor(window=100)
         self.logger = create_logger()
+        self.api_gateway = APIGateway(self)
         self._lock = threading.RLock()
         self._setup_subscriptions()
         self._register_event_contract()

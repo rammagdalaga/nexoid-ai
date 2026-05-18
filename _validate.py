@@ -39,6 +39,12 @@ files = [
     'db/interface.py',
     'db/memory_db.py',
     'db/schema.py',
+    'security/usage_tracker.py',
+    'security/api_key_auth.py',
+    'api/streaming.py',
+    'api/response.py',
+    'api/router.py',
+    'api/gateway.py',
 ]
 
 all_ok = True
@@ -57,6 +63,14 @@ for f in files:
         all_ok = False
 
 checks = {
+
+    'api_gateway_exists': ('api/gateway.py', ['class APIGateway', '/v1/inference', '/v1/chat', '/v1/batch', '/v1/evaluate']),
+    'api_router_exists': ('api/router.py', ['class APIRouter', 'register', 'dispatch']),
+    'api_response_exists': ('api/response.py', ['status', 'latency_ms', 'version']),
+    'api_streaming_exists': ('api/streaming.py', ['stream_chunks', 'simple_tokenize']),
+    'api_key_enforcement_active': ('api/gateway.py', ['APIKeyAuth', 'validate(key)', 'enforce_rate_limit']),
+    'all_api_routes_require_auth': ('api/gateway.py', ['unauthorized', 'extract_key']),
+    'no_direct_model_bypass': ('core/system_manager.py', ['submit_inference_payload']),
     'system_manager_integrates_modules': (
         'core/system_manager.py',
         ['TrainingOrchestrator', 'CheckpointManager', 'InferenceBatcher', 'HealthMonitor', 'EventBus']
