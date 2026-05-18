@@ -36,6 +36,7 @@ from models.config      import ModelConfig
 from models.transformer import GPT
 from training.dataset   import make_loader
 from training.optimizer import make_optimizer
+from training.checkpoint_manager import CheckpointManager
 
 
 # ── Optional dependencies ────────────────────
@@ -197,6 +198,7 @@ def train(cfg: ModelConfig, resume_path: str = None):
             if is_main:
                 print("[DeepSpeed] Not installed. Falling back to standard training.")
 
+    ckpt_manager = CheckpointManager(cfg.checkpoint_dir, keep_last_n=5)
     start_step = 0
     if resume_path:
         if deepspeed_engine is not None:
@@ -277,6 +279,9 @@ def train(cfg: ModelConfig, resume_path: str = None):
                 desc="Training", unit="step", dynamic_ncols=True,
                 disable=not is_main)
 
+    unstable_count = 0
+    explosion_factor = 20.0
+
     for step in pbar:
         lr = get_lr(step, cfg)
         for pg in optimizer.param_groups:
@@ -297,14 +302,32 @@ def train(cfg: ModelConfig, resume_path: str = None):
             if use_amp:
                 with torch.autocast(device_type="cuda", dtype=torch.float16):
                     _, loss = model(x, y)
-                loss = loss / grad_accum_steps
-                scaler.scale(loss).backward()
             else:
                 _, loss = model(x, y)
-                loss = loss / grad_accum_steps
-                loss.backward()
 
-            accum_loss += loss.item()
+            if torch.isnan(loss) or torch.isinf(loss):
+                unstable_count += 1
+                log(f"[Stability] NaN/Inf loss at step={step}; halting safely.")
+                safe_path = ckpt_manager.save(step, model.state_dict(), optimizer.state_dict(), {"reason": "nan_inf"})
+                log(f"[Stability] Recovery checkpoint: {safe_path}")
+                break
+
+            if loss.item() > explosion_factor * max(best_val_loss, 1e-6):
+                unstable_count += 1
+                log(f"[Stability] Loss explosion at step={step}: loss={loss.item():.4f}")
+                if unstable_count >= 2:
+                    safe_path = ckpt_manager.save(step, model.state_dict(), optimizer.state_dict(), {"reason": "loss_explosion"})
+                    log(f"[Stability] Recovery checkpoint: {safe_path}")
+                    break
+            else:
+                unstable_count = 0
+
+            loss = loss / grad_accum_steps
+            if use_amp:
+                scaler.scale(loss).backward()
+            else:
+                loss.backward()
+            accum_loss += loss.item() * grad_accum_steps
 
         if deepspeed_engine is not None:
             # DeepSpeed handles gradient clipping and stepping
