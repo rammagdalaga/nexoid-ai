@@ -27,6 +27,18 @@ from models.transformer import GPT
 from tokenizer.tokenizer import CodeTokenizer
 from inference.generate import find_latest_checkpoint, load_model, generate
 from inference.streaming import TokenStreamer
+from security.rate_limit import create_rate_limiter, RateLimitRule
+from security.validation import (
+    MAX_BODY_BYTES,
+    ValidationError,
+    bounded_float,
+    bounded_int,
+    extract_chat_prompt,
+    require_object,
+    sanitize_prompt,
+    validate_endpoint_schema,
+)
+from security.logging import create_logger
 
 
 # ── Global model instance (lazy loaded) ─────
@@ -35,6 +47,11 @@ _model = None
 _tokenizer = None
 _cfg = None
 _device = None
+_RATE_LIMITER = create_rate_limiter()
+_LOGGER = create_logger()
+GLOBAL_RULE = RateLimitRule(limit=120, window_seconds=60)
+INFER_RULE = RateLimitRule(limit=30, window_seconds=60)
+AUTH_RULE = RateLimitRule(limit=5, window_seconds=900)
 
 
 def get_model(ckpt_path: Optional[str] = None):
@@ -77,34 +94,85 @@ class InferenceHandler(BaseHTTPRequestHandler):
         else:
             self._send_error(404, "Not found")
 
+    def _client_ip(self) -> str:
+        xff = self.headers.get("X-Forwarded-For", "")
+        if xff:
+            return xff.split(",")[0].strip()
+        return self.client_address[0]
+
+    def _client_user(self) -> str:
+        return self.headers.get("X-User-Id", "anonymous")
+
+    def _rate_limit_or_reject(self, rule: RateLimitRule, bucket: str) -> bool:
+        ip = self._client_ip()
+        user = self._client_user()
+        endpoint = urlparse(self.path).path
+        keys = [
+            f"{bucket}:ip:{ip}:endpoint:{endpoint}",
+            f"{bucket}:user:{user}:endpoint:{endpoint}",
+            f"{bucket}:global:endpoint:{endpoint}",
+        ]
+        for k in keys:
+            if not _RATE_LIMITER.allow(k, rule):
+                _LOGGER.log("security", "rate_limit_block", ip=ip, user=user, bucket=bucket, endpoint=endpoint)
+                self._send_error(429, "Rate limit exceeded")
+                return False
+        return True
+
     def do_POST(self):
         parsed = urlparse(self.path)
+        if not self._rate_limit_or_reject(GLOBAL_RULE, "global"):
+            return
+
         content_length = int(self.headers.get("Content-Length", 0))
+        if content_length > MAX_BODY_BYTES:
+            self._send_error(413, "Payload too large")
+            return
+
         body = self.rfile.read(content_length) if content_length > 0 else b"{}"
 
         try:
-            data = json.loads(body)
+            data = require_object(json.loads(body))
         except json.JSONDecodeError:
             self._send_error(400, "Invalid JSON")
             return
+        except ValidationError as e:
+            self._send_error(400, str(e))
+            return
 
-        if parsed.path == "/v1/completions":
-            self._handle_completion(data)
-        elif parsed.path == "/v1/chat/completions":
-            self._handle_chat(data)
-        elif parsed.path == "/v1/generate":
-            self._handle_generate(data)
-        else:
-            self._send_error(404, "Not found")
+        try:
+            if parsed.path == "/v1/completions":
+                validate_endpoint_schema("inference", data)
+                if not self._rate_limit_or_reject(INFER_RULE, "inference"):
+                    return
+                self._handle_completion(data)
+            elif parsed.path == "/v1/chat/completions":
+                validate_endpoint_schema("inference", data)
+                if not self._rate_limit_or_reject(INFER_RULE, "inference"):
+                    return
+                self._handle_chat(data)
+            elif parsed.path == "/v1/generate":
+                validate_endpoint_schema("inference", data)
+                if not self._rate_limit_or_reject(INFER_RULE, "inference"):
+                    return
+                self._handle_generate(data)
+            elif parsed.path == "/v1/auth/login":
+                if not self._rate_limit_or_reject(AUTH_RULE, "auth"):
+                    return
+                self._send_error(501, "Auth endpoint not implemented")
+            else:
+                self._send_error(404, "Not found")
+        except ValidationError as e:
+            self._send_error(400, str(e))
 
     def _handle_completion(self, data: Dict):
         """Handle OpenAI-compatible completion requests."""
-        prompt = data.get("prompt", "")
-        max_tokens = data.get("max_tokens", 256)
-        temperature = data.get("temperature", 0.8)
-        top_k = data.get("top_k", 40)
-        top_p = data.get("top_p", 0.95)
-        stream = data.get("stream", False)
+        prompt = sanitize_prompt(data.get("prompt", ""))
+        max_tokens = bounded_int(data.get("max_tokens"), "max_tokens", 256, 1, 2048)
+        temperature = bounded_float(data.get("temperature"), "temperature", 0.8, 0.0, 2.0)
+        top_k = bounded_int(data.get("top_k"), "top_k", 40, 1, 200)
+        top_p = bounded_float(data.get("top_p"), "top_p", 0.95, 0.0, 1.0)
+        stream = bool(data.get("stream", False))
 
         model, tokenizer, cfg = get_model()
 
@@ -130,15 +198,9 @@ class InferenceHandler(BaseHTTPRequestHandler):
 
     def _handle_chat(self, data: Dict):
         """Handle chat completion requests (simplified)."""
-        messages = data.get("messages", [])
-        max_tokens = data.get("max_tokens", 256)
-        temperature = data.get("temperature", 0.8)
-
-        # Extract last user message as prompt
-        prompt = ""
-        for msg in messages:
-            if msg.get("role") == "user":
-                prompt = msg.get("content", "")
+        prompt = extract_chat_prompt(data.get("messages", []))
+        max_tokens = bounded_int(data.get("max_tokens"), "max_tokens", 256, 1, 2048)
+        temperature = bounded_float(data.get("temperature"), "temperature", 0.8, 0.0, 2.0)
 
         model, tokenizer, cfg = get_model()
         result = generate(prompt, model, tokenizer, cfg, _device,
@@ -152,11 +214,11 @@ class InferenceHandler(BaseHTTPRequestHandler):
 
     def _handle_generate(self, data: Dict):
         """Handle code generation requests."""
-        prompt = data.get("prompt", "")
-        max_tokens = data.get("max_tokens", 256)
-        temperature = data.get("temperature", 0.8)
-        top_k = data.get("top_k", 40)
-        top_p = data.get("top_p", 0.95)
+        prompt = sanitize_prompt(data.get("prompt", ""))
+        max_tokens = bounded_int(data.get("max_tokens"), "max_tokens", 256, 1, 2048)
+        temperature = bounded_float(data.get("temperature"), "temperature", 0.8, 0.0, 2.0)
+        top_k = bounded_int(data.get("top_k"), "top_k", 40, 1, 200)
+        top_p = bounded_float(data.get("top_p"), "top_p", 0.95, 0.0, 1.0)
 
         model, tokenizer, cfg = get_model()
         result = generate(prompt, model, tokenizer, cfg, _device,
@@ -224,6 +286,7 @@ def start_server(host: str = "0.0.0.0", port: int = 8080,
     print(f"[APEXAI] Model loaded: {_model.num_params()/1e6:.1f}M params")
 
     print(f"[APEXAI] Server ready at http://{host}:{port}")
+    _LOGGER.log("security", "server_start", host=host, port=port, stateless_mode=True)
     print(f"  Endpoints:")
     print(f"    GET  /health          — Health check")
     print(f"    GET  /v1/models        — List models")
