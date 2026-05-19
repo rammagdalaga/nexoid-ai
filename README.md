@@ -1,8 +1,8 @@
 ![Nexoid Atlas Banner](./nexoid-banner.jpg)
 
-# ApexAI — Phase 2 Finalized Runtime Core
+# Nexoid AI — Phase 2 Finalized Runtime Core
 
-ApexAI is a **from-scratch transformer intelligence system** focused on coding workflows.
+Nexoid AI is a **from-scratch transformer intelligence system** focused on coding workflows.
 
 ## Phase 2 Status
 
@@ -37,7 +37,7 @@ Implemented in `core/pipeline.py` via strict stage ordering and validation gates
 
 ## Strict Dependency Rules
 
-ApexAI enforces:
+Nexoid AI enforces:
 - **NO** OpenAI/Anthropic/Cohere SDK usage
 - **NO** transformers/vLLM/LangChain/PEFT/TRL/accelerate usage
 - Only HuggingFace `datasets` allowed for dataset ingestion
@@ -69,14 +69,14 @@ python main.py train --config small
 Structured trace mode is available via environment variable:
 
 ```bash
-export APEXAI_TRACE_MODE=1
+export NEXOID_TRACE_MODE=1
 ```
 
 When enabled, trace-level events are emitted for pipeline/reconciliation and key lifecycle operations through existing structured logging routes.
 
 ---
 
-Built under the Nexoid.ai / ApexAI system.
+Built under the Nexoid AI system.
 
 
 ## Phase 2 Release Notes
