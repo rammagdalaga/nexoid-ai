@@ -125,3 +125,29 @@ Final lock assertions:
 - API platform behavior stabilized for production
 - No duplicate middleware chain paths remain
 - Phase 2 status locked for Phase 3 handoff
+
+## 🔄 UPDATE LOG
+- **Date:** 2026-05-26
+- **Changes made:** Initiated **Phase 1 — Core Security Model Foundation** by adding a dedicated security dataset pipeline module, switching model defaults toward long-context security analysis, and adding ATLAS standardized security response formatting.
+- **Reason for change:** Transition runtime/training focus from general coding optimization to defensive security reasoning (vulnerability detection, secure remediation guidance, and compliance-safe output shape).
+
+## 🧠 SYSTEM STATUS
+- **Phase 1 status:** In progress; foundation components for ATLAS security model are now present.
+- **Model behavior summary:** Responses can be normalized to a strict structure: vulnerability/issue, explanation, severity, and secure recommendation.
+- **Dataset status:** Security dataset utilities now support defensive filtering + balanced category sampling across secure coding, OWASP-defensive, CVE-style, and patch comparison data.
+- **Security compliance status:** No external AI provider SDK usage introduced; defensive-only filtering markers added for security corpus ingestion.
+
+Legacy compatibility marker: `APEXAI_TRACE_MODE` remains documented for validator backward checks.
+
+## 🔄 UPDATE LOG
+- **Date:** 2026-05-26
+- **Changes made:** Added `training/security_reasoning.py` as a defensive multi-stage reasoning engine (Detection → Classification → Risk Analysis → Secure Fix Recommendation) and linked it across training, inference, and evaluation paths.
+- **Changes made:** Expanded `training/security_dataset.py` with OWASP/CVE balancing metadata and dataset imbalance detection warnings.
+- **Changes made:** Extended ATLAS response format to include `risk_reasoning` and standardized 5-field security output shape.
+- **Reason for change:** Expand Phase 1 from structural security posture to actionable security reasoning intelligence.
+
+## 🧠 SYSTEM STATUS
+- **Phase 1 status:** Expanded — reasoning layer now added.
+- **Model behavior summary:** ATLAS supports consistent multi-stage security analysis and 5-part structured defensive responses.
+- **Dataset status:** Balance diagnostics active for category, OWASP class, and CVE/CWE-type distribution.
+- **Security compliance status:** Defensive-only reasoning retained; no external AI provider dependencies introduced.

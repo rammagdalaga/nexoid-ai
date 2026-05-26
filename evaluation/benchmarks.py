@@ -13,6 +13,7 @@ import subprocess
 import tempfile
 from typing import Dict, List, Optional, Callable
 from dataclasses import dataclass, field
+from training.security_reasoning import analyze_security_reasoning
 
 
 @dataclass
@@ -356,3 +357,13 @@ BENCHMARK_PRESETS = {
 def get_benchmark(name: str = "all") -> List[EvalCase]:
     """Get a benchmark preset by name."""
     return BENCHMARK_PRESETS.get(name, BENCHMARK_PRESETS["all"])
+
+def evaluate_security_reasoning_pipeline(samples: List[str]) -> Dict[str, int]:
+    """Evaluation-side consistency check for multi-stage security reasoning."""
+    stage_hits = {"detection": 0, "classification": 0, "risk_analysis": 0, "secure_fix_recommendation": 0}
+    for sample in samples:
+        result = analyze_security_reasoning(sample)
+        for stage in stage_hits:
+            if stage in result.stage_outputs and result.stage_outputs[stage]:
+                stage_hits[stage] += 1
+    return stage_hits

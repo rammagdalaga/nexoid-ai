@@ -37,6 +37,7 @@ from models.transformer import GPT
 from training.dataset   import make_loader
 from training.optimizer import make_optimizer
 from training.checkpoint_manager import CheckpointManager
+from training.security_reasoning import analyze_security_reasoning
 
 
 # ── Optional dependencies ────────────────────
@@ -154,7 +155,7 @@ def train(cfg: ModelConfig, resume_path: str = None):
     else:
         world_info = {"is_distributed": False, "world_size": 1, "rank": 0}
 
-    print(f"[APEXAI] device={device}  amp={use_amp}  "
+    print(f"[ATLAS] device={device}  amp={use_amp}  "
           f"grad_accum={grad_accum_steps}  "
           f"effective_batch={cfg.batch_size * grad_accum_steps * world_info['world_size']}")
 
@@ -166,7 +167,7 @@ def train(cfg: ModelConfig, resume_path: str = None):
         real_vocab = m.get("vocab_size", cfg.vocab_size)
         if real_vocab != cfg.vocab_size:
             if is_main:
-                print(f"[APEXAI] vocab_size {cfg.vocab_size} → {real_vocab}")
+                print(f"[ATLAS] vocab_size {cfg.vocab_size} → {real_vocab}")
             cfg.vocab_size = real_vocab
 
     # data
@@ -219,7 +220,7 @@ def train(cfg: ModelConfig, resume_path: str = None):
         log_file.flush()
 
     log(f"\n{'='*65}")
-    log(f"[APEXAI] Training  params={model.num_params()/1e6:.1f}M  "
+    log(f"[ATLAS] Training  params={model.num_params()/1e6:.1f}M  "
         f"vocab={cfg.vocab_size}  ctx={cfg.block_size}  "
         f"max_seq={cfg.max_seq_len}  "
         f"iters={cfg.max_iters}  device={device}  "
@@ -369,7 +370,7 @@ def train(cfg: ModelConfig, resume_path: str = None):
                             is_distributed=world_info["is_distributed"])
 
     pbar.close()
-    log(f"\n[APEXAI] Training complete.  best_val_loss={best_val_loss:.4f}")
+    log(f"\n[ATLAS] Training complete.  best_val_loss={best_val_loss:.4f}")
     log_file.close()
 
     if wandb_run:

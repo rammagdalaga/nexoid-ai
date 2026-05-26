@@ -274,5 +274,43 @@ for am in api_modules:
         print(f'  ✗ api_changelog_blocks: {am}')
         all_ok = False
 
+
+
+# Phase 1 reasoning expansion checks
+if (root / 'training/security_reasoning.py').exists():
+    reason_txt = (root / 'training/security_reasoning.py').read_text(encoding='utf-8')
+    required_reason = ['Detection', 'Classification', 'Risk Analysis', 'Secure Fix Recommendation', 'CATEGORY_PATTERNS']
+    miss = [r for r in required_reason if r not in reason_txt]
+    if miss:
+        print(f'  ✗ security_reasoning_module: missing {miss}')
+        all_ok = False
+    else:
+        print('  ✓ security_reasoning_module')
+else:
+    print('  ✗ security_reasoning_module: file missing')
+    all_ok = False
+
+sd_txt = (root / 'training/security_dataset.py').read_text(encoding='utf-8') if (root / 'training/security_dataset.py').exists() else ''
+if 'detect_dataset_imbalance' in sd_txt and 'OWASP_BALANCE_KEYS' in sd_txt and 'CVE_TYPE_KEYS' in sd_txt:
+    print('  ✓ dataset_balance_checks_exist')
+else:
+    print('  ✗ dataset_balance_checks_exist')
+    all_ok = False
+
+fmt_txt = (root / 'security/atlas_formatter.py').read_text(encoding='utf-8') if (root / 'security/atlas_formatter.py').exists() else ''
+if all(k in fmt_txt for k in ['issue_detection', 'explanation', 'severity_level', 'risk_reasoning', 'secure_fix_recommendation']):
+    print('  ✓ formatter_reasoning_consistency')
+else:
+    print('  ✗ formatter_reasoning_consistency')
+    all_ok = False
+
+for mod in ['training/train.py', 'inference/generate.py', 'evaluation/benchmarks.py']:
+    txt = (root / mod).read_text(encoding='utf-8')
+    if 'analyze_security_reasoning' in txt:
+        print(f'  ✓ reasoning_pipeline_linked: {mod}')
+    else:
+        print(f'  ✗ reasoning_pipeline_linked: {mod}')
+        all_ok = False
+
 print(f'\n{"All files OK!" if all_ok else "Some files have errors!"}')
 sys.exit(0 if all_ok else 1)
