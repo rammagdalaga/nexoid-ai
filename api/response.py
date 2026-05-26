@@ -5,7 +5,7 @@ from typing import Dict, Any
 
 
 API_VERSION = "0.2.0"
-MODEL_NAME = "apexai"
+MODEL_NAME = "atlas-v1-security"
 
 
 def success(data: Dict[str, Any], start_time: float, request_id: str = "") -> Dict[str, Any]:
@@ -43,3 +43,19 @@ CHANGELOG:
 - Streaming + routing integration hardened
 - Production readiness improved
 """
+
+
+def security_result(issue: str, explanation: str, severity: str, recommendation: str, start_time: float, request_id: str = "") -> Dict[str, Any]:
+    """Return ATLAS standardized security response envelope."""
+    from security.atlas_formatter import format_security_response
+
+    return success(
+        data=format_security_response(
+            issue=issue,
+            explanation=explanation,
+            severity=severity,
+            fix=recommendation,
+        ),
+        start_time=start_time,
+        request_id=request_id,
+    )

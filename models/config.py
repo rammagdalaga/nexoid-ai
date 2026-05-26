@@ -1,5 +1,5 @@
 """
-APEXAI — Model Configuration
+ATLAS v1 — Security Model Configuration
 Single source of truth for all hyperparameters.
 Presets: small (~15M), medium (~85M), large (~307M), XL (~1B), XXL (~3B)
 
@@ -44,7 +44,7 @@ from typing import Optional, Literal
 class ModelConfig:
     # ── Vocabulary & Sequence ────────────────
     vocab_size:  int = 32000    # matches The Stack BPE tokenizer
-    block_size:  int = 256      # base context length
+    block_size:  int = 1024      # base context length for code+security reasoning
 
     # ── Architecture ─────────────────────────
     n_embd:  int = 512          # embedding dimension
@@ -56,7 +56,7 @@ class ModelConfig:
     rope_base:        float = 10000.0   # base frequency for RoPE
     rope_scaling:     Literal["linear", "dynamic", "ntk", "none"] = "none"
     rope_scale_factor: float = 1.0      # scaling factor for long context (e.g. 2.0 for 2x)
-    max_seq_len:      int = 4096        # maximum sequence length supported
+    max_seq_len:      int = 16384        # long-context support for security audits
 
     # ── Flash Attention ─────────────────────
     use_flash_attn: bool = False   # Use Flash Attention if available
@@ -86,11 +86,11 @@ class ModelConfig:
     ])
     multilingual_training: bool = False
 
-    # ── SEO Specialization ──────────────────
-    seo_tokens: list = field(default_factory=lambda: [
-        "<|seo|>", "<|meta|>", "<|schema|>", "<|accessibility|>", "<|lighthouse|>"
+    # ── Security Specialization ───────────────
+    security_tokens: list = field(default_factory=lambda: [
+        "<|security|>", "<|vuln|>", "<|owasp|>", "<|cve|>", "<|patch|>", "<|defensive|>"
     ])
-    seo_training: bool = False
+    security_training: bool = True
 
     # ── Regularization ──────────────────────
     embd_dropout:  float = 0.1
