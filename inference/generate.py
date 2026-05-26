@@ -16,6 +16,7 @@ if ROOT not in sys.path:
 from models.config       import ModelConfig, estimate_param_count
 from models.transformer  import GPT
 from tokenizer.tokenizer import CodeTokenizer
+from training.security_reasoning import analyze_security_reasoning
 
 
 def find_latest_checkpoint(ckpt_dir="checkpoints"):
@@ -92,3 +93,8 @@ def interactive_loop(model, tokenizer, cfg, device):
         print("\n" + "─" * 50)
         print(prompt + result)
         print("─" * 50)
+
+def generate_security_analysis(code_snippet: str) -> dict:
+    """Inference-side 4-stage defensive security analysis."""
+    reasoning = analyze_security_reasoning(code_snippet)
+    return reasoning.stage_outputs

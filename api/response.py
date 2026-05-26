@@ -45,15 +45,16 @@ CHANGELOG:
 """
 
 
-def security_result(issue: str, explanation: str, severity: str, recommendation: str, start_time: float, request_id: str = "") -> Dict[str, Any]:
+def security_result(issue_detection: str, explanation: str, severity: str, risk_reasoning: str, recommendation: str, start_time: float, request_id: str = "") -> Dict[str, Any]:
     """Return ATLAS standardized security response envelope."""
     from security.atlas_formatter import format_security_response
 
     return success(
         data=format_security_response(
-            issue=issue,
+            issue_detection=issue_detection,
             explanation=explanation,
             severity=severity,
+            risk_reasoning=risk_reasoning,
             fix=recommendation,
         ),
         start_time=start_time,

@@ -37,6 +37,7 @@ from models.transformer import GPT
 from training.dataset   import make_loader
 from training.optimizer import make_optimizer
 from training.checkpoint_manager import CheckpointManager
+from training.security_reasoning import analyze_security_reasoning
 
 
 # ── Optional dependencies ────────────────────
